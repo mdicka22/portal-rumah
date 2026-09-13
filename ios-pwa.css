@@ -1,0 +1,7 @@
+/* iPhone/iPad standalone: sisakan ruang aman agar navigasi bawah tidak tertutup Home indicator. */
+html,body,#app{min-height:100%;background:#ef1a32}
+.app-bg{min-height:100dvh}
+.phone-app{height:100dvh}
+.viewport{padding-bottom:calc(88px + env(safe-area-inset-bottom))}
+.bottom{height:calc(64px + env(safe-area-inset-bottom));padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+@media(display-mode:standalone){.phone-app{height:100dvh;min-height:100dvh}.app-bg{padding:0}.bottom{padding-bottom:calc(8px + env(safe-area-inset-bottom))}}
