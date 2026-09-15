@@ -9,3 +9,5 @@
 .leaflet-popup-content-wrapper{border-radius:12px!important}
 .leaflet-popup-content{font-family:"DM Sans",sans-serif!important;font-size:12px!important}
 .family-map .leaflet-control-container .leaflet-top,.family-map .leaflet-control-container .leaflet-bottom{z-index:5}
+svg{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle;flex:0 0 auto}
+.add-card{display:flex;align-items:center;justify-content:center;gap:6px}.add-card svg{width:18px;height:18px}
