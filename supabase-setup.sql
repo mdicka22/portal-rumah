@@ -89,14 +89,14 @@ create or replace function public.join_family(code text, member_name text)
 returns table(family_id uuid, family_name text)
 language plpgsql security definer set search_path=public
 as $$
-declare target_id uuid; target_name text;
+declare found_family_id uuid; found_family_name text;
 begin
   if auth.uid() is null then raise exception 'Login diperlukan'; end if;
-  select id,name into target_id,target_name from families where invite_code=upper(trim(code));
-  if target_id is null then raise exception 'Kode keluarga tidak ditemukan'; end if;
-  insert into family_members(family_id,user_id,display_name,role)
-  values(target_id,auth.uid(),member_name,'member') on conflict(family_id,user_id) do nothing;
-  return query select target_id,target_name;
+  select f.id,f.name into found_family_id,found_family_name from public.families f where f.invite_code=upper(trim(code));
+  if found_family_id is null then raise exception 'Kode keluarga tidak ditemukan'; end if;
+  insert into public.family_members(family_id,user_id,display_name,role)
+  values(found_family_id,auth.uid(),member_name,'member') on conflict on constraint family_members_pkey do nothing;
+  return query select found_family_id,found_family_name;
 end $$;
 
 grant execute on function public.create_family(text,text) to authenticated;
@@ -138,7 +138,7 @@ create policy "uploader deletes document files" on storage.objects as permissive
 create table if not exists public.family_records (
   id uuid primary key default gen_random_uuid(),
   family_id uuid not null references public.families(id) on delete cascade,
-  record_type text not null check (record_type in ('agenda','shopping','health','bill','vehicle','home','place')),
+  record_type text not null check (record_type in ('agenda','shopping','health','bill','vehicle','home','place','emergency')),
   title text not null,
   detail jsonb not null default '{}'::jsonb,
   completed boolean not null default false,
