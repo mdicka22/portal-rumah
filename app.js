@@ -216,3 +216,16 @@ render();
 // --- Preview arsip final: modal hanya menampilkan Bagikan dan Download ---
 const openDocumentPreviewArchiveFinal=openDocumentPreview;
 openDocumentPreview=async function(doc){await openDocumentPreviewArchiveFinal(doc);$('#documentPreview [data-doc-rename]')?.remove();$('#documentPreview [data-doc-delete]')?.remove();$('#documentPreview [data-doc-full]')?.remove()};
+
+// --- Badge internal app: chat belum dibaca, tugas, dan belanja ---
+status=function(){return ''};
+function badgeNumber(value){const count=Number(value)||0;return count>99?'99+':String(count)}
+function chatReadKey(){return `portalChatRead:${session?.user?.id||'anon'}:${state.family?.id||'no-family'}`}
+function chatLastRead(){return Number(localStorage.getItem(chatReadKey())||0)}
+function markChatReadLocal(){if(!state.family)return;localStorage.setItem(chatReadKey(),String(Date.now()))}
+function unreadChatCount(){const me=session?.user?.id,last=chatLastRead();return (state.messages||[]).filter(message=>message.sender_id!==me&&new Date(message.created_at).getTime()>last).length}
+function appBadgeCount(page){if(page==='chat')return unreadChatCount();if(page==='quest')return (state.cloudTasks||[]).filter(task=>!task.completed).length;if(page==='shop')return (state.shopping||[]).filter(item=>!item[1]).length;return 0}
+function renderInAppBadges(){['chat','quest','shop'].forEach(page=>{$$(`[data-page="${page}"]`).forEach(button=>{button.querySelector('.module-badge')?.remove();const count=appBadgeCount(page);if(count>0){const badge=document.createElement('span');badge.className='module-badge';badge.textContent=badgeNumber(count);badge.setAttribute('aria-label',`${count} belum selesai atau belum dibaca`);button.append(badge)}})})}
+const renderBeforeInAppBadges=render;
+render=function(){renderBeforeInAppBadges();if(state.page==='chat')markChatReadLocal();renderInAppBadges()};
+render();
