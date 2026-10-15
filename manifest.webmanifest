@@ -3,8 +3,8 @@
   "short_name": "Portal Rumah",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#ef1a32",
-  "theme_color": "#ef1a32",
+  "background_color": "#2c42cf",
+  "theme_color": "#2c42cf",
   "lang": "id-ID",
   "icons": [
     {
