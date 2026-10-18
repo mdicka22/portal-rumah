@@ -61,21 +61,25 @@ function weatherEnsure(){
   navigator.permissions?.query({name:'geolocation'}).then(p=>{if(p.state==='granted')weatherLocate()}).catch(()=>{});
 }
 
+/* Strip cuaca & udara satu baris di beranda */
 function weatherSection(){
   const d=wx.data,
-    head=(sub,btn=true)=>`<div class="section-head"><div><h2>Cuaca &amp; Udara</h2>${sub?`<small class="head-sub">${sub}</small>`:''}</div>${btn?`<button type="button" class="link-btn" data-weather-refresh aria-label="Perbarui cuaca">${icons.refresh} Perbarui</button>`:''}</div>`,
-    note=(icon,title,text,action)=>`<div class="card wx-note"><i class="chip tone-sky">${icons[icon]}</i><span class="row-main"><b>${title}</b><small>${text}</small></span>${action}</div>`,
+    note=(icon,title,text,action)=>`<section class="wx-wrap"><div class="card wx-note"><i class="chip tone-sky">${icons[icon]}</i><span class="row-main"><b>${title}</b><small>${text}</small></span>${action}</div></section>`,
     retry=label=>`<button type="button" class="pill-btn soft" data-weather-refresh>${label}</button>`;
   if(d&&(d.w||d.a)){
     const wl=d.w?weatherLook(d.w.code,d.w.day):null,al=d.a?aqiLook(d.a.aqi):null,
-      time=new Date(d.t).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}),
+      time=new Date(d.t).toLocaleTimeString(LOC(),{hour:'2-digit',minute:'2-digit'}),
       tip=[al?al[2]:'',d.w&&d.w.rain>=60?'Kemungkinan hujan tinggi, siapkan payung.':''].filter(Boolean).join(' ');
-    return `<section class="section">${head(`${d.place?safeText(d.place)+' · ':''}diperbarui ${time}`)}<div class="pair">${d.w?`<div class="mini wx tone-${wl[2]}"><i>${icons[wl[1]]}</i><span><b class="wx-big">${d.w.temp}°</b><small class="wx-level">${wl[0]}</small><small>Terasa ${d.w.feels}°${d.w.rain!=null?` · hujan ${d.w.rain}%`:''}</small></span></div>`:''}${d.a?`<div class="mini wx tone-${al[1]}"><i>${icons.wind}</i><span><b class="wx-big">${d.a.aqi}<em>AQI</em></b><small class="wx-level">${al[0]}</small><small>${d.a.pm25!=null?`PM2.5 ${d.a.pm25} µg/m³`:'Kualitas udara'}</small></span></div>`:''}</div>${tip?`<p class="wx-tip">${tip}</p>`:''}</section>`;
+    return `<section class="wx-wrap"><div class="card wx-strip">
+      ${d.w?`<div class="wx-cell tone-${wl[2]}"><i>${icons[wl[1]]}</i><span><b class="wx-big">${d.w.temp}°</b><small>${wl[0]}${d.w.rain!=null?` · hujan ${d.w.rain}%`:''}</small></span></div>`:''}
+      ${d.a?`<div class="wx-cell tone-${al[1]}"><i>${icons.wind}</i><span><b class="wx-big">${d.a.aqi}<em>AQI</em></b><small class="wx-level">${al[0]}</small></span></div>`:''}
+      <button type="button" class="icon-btn ghost wx-refresh" data-weather-refresh aria-label="Perbarui cuaca">${icons.refresh}</button>
+      <p class="wx-foot">${tip?`${tip}<br>`:''}<span>${d.place?safeText(d.place)+' · ':''}diperbarui ${time}</span></p></div></section>`;
   }
-  if(wx.status==='loading')return `<section class="section">${head('Memuat…',false)}<div class="pair"><div class="mini skeleton"></div><div class="mini skeleton"></div></div></section>`;
-  if(wx.status==='denied')return `<section class="section">${head('',false)}${note('map','Izin lokasi ditolak','Aktifkan izin lokasi di pengaturan browser, lalu coba lagi.',retry('Coba lagi'))}</section>`;
-  if(wx.status==='error')return `<section class="section">${head('',false)}${note('alert','Data belum bisa dimuat','Periksa koneksi internet lalu coba lagi.',retry('Coba lagi'))}</section>`;
-  return `<section class="section">${head('',false)}${note('cloudSun','Cuaca hari ini','Izinkan lokasi untuk melihat cuaca dan kualitas udara di sekitarmu.',retry('Izinkan'))}</section>`;
+  if(wx.status==='loading')return `<section class="wx-wrap"><div class="card wx-strip skeleton-strip"></div></section>`;
+  if(wx.status==='denied')return note('map','Izin lokasi ditolak','Aktifkan izin lokasi di pengaturan browser, lalu coba lagi.',retry('Coba lagi'));
+  if(wx.status==='error')return note('alert','Data belum bisa dimuat','Periksa koneksi internet lalu coba lagi.',retry('Coba lagi'));
+  return note('cloudSun','Cuaca hari ini','Izinkan lokasi untuk melihat cuaca dan udara.',retry('Izinkan'));
 }
 
 document.addEventListener('click',event=>{if(event.target.closest('[data-weather-refresh]')){event.preventDefault();weatherLocate()}},true);
