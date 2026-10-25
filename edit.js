@@ -181,12 +181,85 @@ document.addEventListener('input',event=>{
   if(!q){box.hidden=true;normal.hidden=false;return}
   const docs=(state.cloudDocs||[]).filter(d=>`${d.file_name} ${d.category}`.toLowerCase().includes(q)),kb=x=>Math.max(1,Math.round((x.file_size||0)/1024));
   normal.hidden=true;box.hidden=false;
-  box.innerHTML=docs.length?`<div class="list archive-list">${docs.map(x=>`<article class="row document-row"><button type="button" class="document-main" data-doc-preview="${x.id}"><i class="chip tone-indigo">${icons[/\.(png|jpe?g|webp|gif)$/i.test(x.file_name||'')?'image':'file']}</i><span class="row-main"><b>${esc(x.file_name)}</b><small>${esc(x.category)} · ${kb(x)} KB</small></span></button></article>`).join('')}</div>`:emptyState('archive','Tidak ditemukan','Coba kata kunci lain.');
+  box.innerHTML=docs.length?`<div class="list archive-list">${docs.map(x=>`<article class="row document-row"><button type="button" class="document-main" data-doc-preview="${x.id}"><i class="chip tone-indigo">${icons[/\.(png|jpe?g|webp|gif)$/i.test(x.file_name||'')?'image':'file']}</i><span class="row-main"><b>${esc(x.file_name)}</b><small>${esc(x.category)} · ${kb(x)} KB</small></span></button><button type="button" class="icon-btn ghost danger" data-doc-delete="${x.id}" aria-label="Hapus arsip">${icons.trash}</button></article>`).join('')}</div>`:emptyState('archive','Tidak ditemukan','Coba kata kunci lain.');
 });
 document.addEventListener('click',event=>{
   const b=event.target.closest('[data-archive-sort]');if(!b)return;
   state.archiveSort=b.dataset.archiveSort;save();render();
 });
+
+/* ================= Arsip: pratinjau lebih cepat & hapus file ================= */
+/* Tautan aman file disimpan sementara (berlaku 1 jam), sehingga membuka ulang file tidak
+   meminta tautan ke server lagi. Tautan semua file di halaman Arsip diminta sekaligus
+   dalam satu panggilan begitu halaman terbuka, jadi saat file diketuk langsung dimuat. */
+const signCache=new Map();
+const signBase=signPrivateFile;
+signPrivateFile=async function(bucket,path,expiresIn=86400){
+  const key=bucket+'|'+path,hit=signCache.get(key);
+  if(hit&&hit.exp>Date.now())return hit.url;
+  const url=await signBase(bucket,path,expiresIn);
+  signCache.set(key,{url,exp:Date.now()+expiresIn*800});
+  return url;
+};
+const absoluteSigned=signed=>signed.startsWith('http')?signed:SB_URL+'/storage/v1'+(signed.startsWith('/')?'':'/')+signed;
+let prefetching=false;
+async function prefetchDocumentUrls(){
+  if(prefetching||state.page!=='archive'||!session?.access_token)return;
+  const fresh=path=>{const hit=signCache.get('family-documents|'+path);return hit&&hit.exp>Date.now()};
+  const docs=(state.cloudDocs||[]).filter(d=>d.file_path&&!fresh(d.file_path)).slice(0,80);
+  if(!docs.length)return;
+  prefetching=true;
+  try{
+    const request=token=>fetch(SB_URL+'/storage/v1/object/sign/family-documents',{method:'POST',headers:{apikey:SB_KEY,Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({expiresIn:3600,paths:docs.map(d=>d.file_path)})});
+    let res=await request(session.access_token);
+    if(res.status===401){await renewSession();res=await request(session.access_token)}
+    if(!res.ok)return;
+    (await res.json()).forEach(item=>{const signed=item.signedURL||item.signedUrl;if(signed&&item.path)signCache.set('family-documents|'+item.path,{url:absoluteSigned(signed),exp:Date.now()+3600*800})});
+  }catch{}finally{prefetching=false}
+}
+/* Jari menyentuh file: untuk gambar, mulai unduh lebih awal. */
+document.addEventListener('pointerdown',event=>{
+  const el=event.target.closest('[data-doc-preview]');if(!el)return;
+  const doc=(state.cloudDocs||[]).find(d=>String(d.id)===String(el.dataset.docPreview));
+  const hit=doc&&signCache.get('family-documents|'+doc.file_path);
+  if(hit&&hit.exp>Date.now()&&/\.(jpe?g|png|webp|gif)$/i.test(doc.file_name||''))new Image().src=hit.url;
+},{passive:true});
+
+/* Pratinjau: indikator "Memuat dokumen…" sampai isinya benar-benar tampil, plus tombol Hapus. */
+const previewBase=openDocumentPreview;
+openDocumentPreview=async function(doc){
+  await previewBase(doc);
+  const modal=$q('#documentPreview');if(!modal)return;
+  const footer=$q('footer',modal);
+  if(footer&&!footer.querySelector('[data-doc-delete]'))footer.insertAdjacentHTML('afterbegin','<button type="button" class="secondary doc-delete" data-doc-delete="'+esc(doc.id)+'">'+icons.trash+'<span>Hapus</span></button>');
+  const media=$q('.document-preview-body img, .document-preview-body iframe',modal);
+  if(media&&!(media.tagName==='IMG'&&media.complete&&media.naturalWidth)){
+    const loader=document.createElement('div');loader.className='document-loading overlay';loader.innerHTML='<i></i><span>Memuat dokumen…</span>';
+    media.parentElement.append(loader);
+    const finish=()=>loader.remove();
+    media.addEventListener('load',finish,{once:true});media.addEventListener('error',finish,{once:true});setTimeout(finish,20000);
+  }
+};
+
+/* Hapus file: pastikan benar-benar terhapus (sebelumnya hasilnya tidak diperiksa). */
+deleteFamilyDocument=async function(doc){
+  if(!await confirmSheet({title:'Hapus dokumen?',message:'"'+doc.file_name+'" akan dihapus permanen.',confirm:'Hapus',danger:true}))return;
+  try{
+    const gone=await sb('/rest/v1/family_documents?id=eq.'+encodeURIComponent(doc.id),{method:'DELETE',headers:{Prefer:'return=representation'}});
+    if(!Array.isArray(gone)||!gone.length)throw new Error('Izin hapus arsip belum aktif. Jalankan SQL supabase-archive-delete.sql terlebih dahulu.');
+    let fileRemoved=false;
+    try{
+      const res=await fetch(SB_URL+'/storage/v1/object/family-documents',{method:'DELETE',headers:{apikey:SB_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({prefixes:[doc.file_path]})});
+      fileRemoved=res.ok&&(await res.json()).length>0;
+    }catch{}
+    signCache.delete('family-documents|'+doc.file_path);
+    state.cloudDocs=(state.cloudDocs||[]).filter(item=>String(item.id)!==String(doc.id));
+    save();$q('#documentPreview')?.remove();render();
+    toast(fileRemoved?'Dokumen dihapus':'Dokumen dihapus. File fisiknya mungkin masih tersimpan; jalankan supabase-archive-delete.sql.');
+  }catch(error){toast(/permission|policy|row-level/i.test(error.message)?'Izin hapus arsip belum aktif. Jalankan SQL supabase-archive-delete.sql terlebih dahulu.':error.message)}
+};
+const renderBeforeArchive=render;
+render=function(){renderBeforeArchive();if(state.page==='archive')prefetchDocumentUrls()};
 
 /* ================= Tombol kembali melayang ================= */
 const BACK_SELECTOR='.page-head [data-action="back"],.page-head [data-hj-back],.page-head [data-tab="home"],.hero-back';

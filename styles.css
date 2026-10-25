@@ -628,3 +628,14 @@ body .onboarding-logout{color:var(--muted)}
 .chat-page{min-height:calc(100dvh - 80px)}
 .float-back{position:absolute;z-index:25;left:14px;top:calc(var(--safe-top) + 12px);width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-size:22px;color:var(--brand);background:rgba(255,255,255,.94);box-shadow:0 8px 22px rgba(20,32,100,.22),0 0 0 1px rgba(20,32,100,.06);opacity:0;transform:translateY(-8px) scale(.9);pointer-events:none;transition:opacity .2s,transform .2s;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .float-back.visible{opacity:1;transform:none;pointer-events:auto}
+
+/* Arsip: pemuatan pratinjau & tombol hapus */
+.document-preview-body{position:relative}
+.document-loading.overlay{position:absolute;inset:0;justify-content:center;background:#eceff9}
+.document-preview-card>footer .doc-delete{display:inline-flex;align-items:center;justify-content:center;gap:6px;color:var(--danger);border-color:#f4c4cf}
+.document-row{padding-right:6px}
+.document-row .icon-btn.ghost{width:38px}
+
+.login-row.end{justify-content:flex-end}
+.link-btn.regen{margin:12px 2px 0;font-size:13px}
+.members .member-row .icon-btn.ghost{width:38px;height:38px}
